@@ -1,0 +1,15 @@
+{
+  "name": "zeninternet",
+  "version": "3.2.0",
+  "private": true,
+  "description": "Zen Internet browser extension",
+  "license": "MIT",
+  "scripts": {
+    "build": "web-ext build --overwrite-dest --source-dir . --artifacts-dir dist --ignore-files \"package*.json\" \"node_modules/**\" \"dist/**\" \".github/**\" \"logo.psd\" \"README.md\" \"*.zip\"",
+    "sign": "web-ext sign --source-dir . --artifacts-dir dist --channel unlisted --api-key \"$FIREFOX_API_KEY\" --api-secret \"$FIREFOX_API_SECRET\" --ignore-files \"package*.json\" \"node_modules/**\" \"dist/**\" \".github/**\" \"logo.psd\" \"README.md\" \"*.zip\"",
+    "lint": "web-ext lint --source-dir . --ignore-files \"package*.json\" \"node_modules/**\" \"dist/**\" \".github/**\""
+  },
+  "devDependencies": {
+    "web-ext": "^8.3.0"
+  }
+}

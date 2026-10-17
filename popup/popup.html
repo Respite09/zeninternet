@@ -119,10 +119,19 @@
             </div>
             <div class="toggle-container">
               <label class="toggle-switch">
+                <input type="checkbox" id="fallback-background-mode">
+                <span class="slider round"></span>
+              </label>
+              <span id="fallback-background-mode-label" class="toggle-label">Fallback Whitelist Mode</span>
+              <span class="help-icon"
+                title="Whitelist mode: fallback background only on sites in the list. Blacklist mode: fallback background on all sites except those in the list.">?</span>
+            </div>
+            <div class="toggle-container">
+              <label class="toggle-switch">
                 <input type="checkbox" id="fallback-background">
                 <span class="slider round"></span>
               </label>
-              <span class="toggle-label">Fallback Background</span>
+              <span id="fallback-background-label" class="toggle-label">Fallback Background</span>
               <span class="help-icon"
                 title="Adds a solid white background color to websites which never had a proper background and skipping still keeps a transparent background.">?</span>
             </div>

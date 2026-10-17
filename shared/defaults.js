@@ -16,6 +16,7 @@ export const DEFAULT_SETTINGS = {
   disableHover: false,
   disableFooter: false,
   fallbackBackgroundList: [],
+  fallbackBackgroundBlacklistMode: false,
   welcomeShown: false,
 };
 
