@@ -66,7 +66,7 @@
       .map(normalize)
       .map((e) => {
         if (e.mode === "remove") return `${e.selector} { display: none !important; }`;
-        if (e.mode === "blur") return `${e.selector} { filter: blur(${Number(e.blur) || 0}px) !important; }`;
+        if (e.mode === "blur") return `${e.selector} { background-color: transparent !important; background-image: none !important; backdrop-filter: blur(${Number(e.blur) || 0}px) !important; -webkit-backdrop-filter: blur(${Number(e.blur) || 0}px) !important; }`;
         const bg = e.alpha > 0 ? hexToRgba(e.color, e.alpha) : "transparent";
         return `${e.selector} { background: ${bg} !important; background-image: none !important; box-shadow: none !important; }\n${e.selector} * { background: transparent !important; background-image: none !important; box-shadow: none !important; }`;
       })
