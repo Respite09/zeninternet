@@ -35,6 +35,17 @@
     return parts.join(" > ");
   }
 
+  // Entries may be legacy strings or {selector, color, alpha}
+  function normalize(e) {
+    return typeof e === "string" ? { selector: e, color: "#000000", alpha: 0 } : e;
+  }
+
+  function hexToRgba(hex, a) {
+    const m = /^#([0-9a-f]{6})$/i.exec(hex) || [null, "000000"];
+    const n = parseInt(m[1], 16);
+    return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${a})`;
+  }
+
   async function getSelectors() {
     const data = await browser.storage.local.get(STORAGE_KEY);
     return (data[STORAGE_KEY] && data[STORAGE_KEY][HOST]) || [];
@@ -51,20 +62,69 @@
       style.id = STYLE_ID;
       (document.head || document.documentElement).appendChild(style);
     }
-    style.textContent =
-      selectors
-        .map((s) => `${s}, ${s} * { background: transparent !important; background-image: none !important; box-shadow: none !important; }`)
-        .join("\n");
+    style.textContent = selectors
+      .map(normalize)
+      .map((e) => {
+        const bg = e.alpha > 0 ? hexToRgba(e.color, e.alpha) : "transparent";
+        return `${e.selector} { background: ${bg} !important; background-image: none !important; box-shadow: none !important; }\n${e.selector} * { background: transparent !important; background-image: none !important; box-shadow: none !important; }`;
+      })
+      .join("\n");
   }
 
-  async function saveSelector(selector) {
+  async function saveSelector(entry) {
     const data = await browser.storage.local.get(STORAGE_KEY);
     const all = data[STORAGE_KEY] || {};
-    const list = all[HOST] || [];
-    if (!list.includes(selector)) list.push(selector);
+    const list = (all[HOST] || []).filter((e) => normalize(e).selector !== entry.selector);
+    list.push(entry);
     all[HOST] = list;
     await browser.storage.local.set({ [STORAGE_KEY]: all });
     renderStyle(list);
+  }
+
+  function showTintPanel(selector, el) {
+    const panel = document.createElement("div");
+    panel.id = "zen-tint-panel";
+    panel.style.cssText =
+      "position:fixed;top:16px;right:16px;z-index:2147483647;background:#222;color:#fff;font:13px sans-serif;" +
+      "padding:12px;border-radius:8px;box-shadow:0 2px 12px rgba(0,0,0,.5);display:flex;flex-direction:column;gap:8px;width:200px;";
+    const label = document.createElement("div");
+    label.textContent = "Element tint";
+    const color = document.createElement("input");
+    color.type = "color";
+    color.value = "#000000";
+    const range = document.createElement("input");
+    range.type = "range";
+    range.min = "0";
+    range.max = "100";
+    range.value = "0";
+    const hint = document.createElement("div");
+    hint.textContent = "0% = fully transparent";
+    const row = document.createElement("div");
+    row.style.cssText = "display:flex;gap:8px;";
+    const ok = document.createElement("button");
+    ok.textContent = "Apply";
+    const cancel = document.createElement("button");
+    cancel.textContent = "Cancel";
+    row.append(ok, cancel);
+    panel.append(label, color, range, hint, row);
+    document.documentElement.appendChild(panel);
+
+    const current = () => ({ selector, color: color.value, alpha: Number(range.value) / 100 });
+    const preview = () => {
+      hint.textContent = range.value + "% tint";
+      renderStyle([current()]);
+    };
+    color.addEventListener("input", preview);
+    range.addEventListener("input", preview);
+    ok.addEventListener("click", () => {
+      panel.remove();
+      saveSelector(current());
+    });
+    cancel.addEventListener("click", async () => {
+      panel.remove();
+      renderStyle(await getSelectors());
+    });
+    preview();
   }
 
   async function reset() {
@@ -103,7 +163,7 @@
     const el = e.target;
     stop();
     if (el && el.nodeType === 1 && el !== document.documentElement) {
-      saveSelector(cssPath(el));
+      showTintPanel(cssPath(el), el);
     }
   }
 
