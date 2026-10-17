@@ -38,6 +38,19 @@ Thanks:
 - to [@YelehaUwU](https://github.com/YelehaUwU) for the contributions on the pop-up UI!
 - to the [Transparent Zen ](https://github.com/frostybiscuit/transparent-zen) for the addon base and the inspiration <3
 
+## Building 🛠️
+
+Requires [Node.js](https://nodejs.org/) 18 or newer.
+
+```bash
+npm install
+npm run build
+```
+
+The packaged extension (`.zip`) is written to the `dist/` folder. To try it locally in Firefox, open `about:debugging#/runtime/this-firefox`, click **Load Temporary Add-on** and select `manifest.json`.
+
+Optionally run `npm run lint` to validate the extension with `web-ext`. Pull requests and non-`main` pushes are built automatically by GitHub Actions (the zip is uploaded as an artifact), and pushes to `main` are built and signed via the deploy workflow.
+
 ## License
 
 This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for more details.
