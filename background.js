@@ -36,6 +36,7 @@ const DEFAULT_SETTINGS = {
   disableDarkReader: false,
   enableLogs: false,
   fallbackBackgroundList: [],
+  fallbackBackgroundBlacklistMode: false,
 };
 
 /**
@@ -520,7 +521,9 @@ async function applyCSSToTab(tab) {
       FALLBACK_BACKGROUND_KEY
     );
     const fallbackBackgroundList = fallbackData[FALLBACK_BACKGROUND_KEY] || [];
-    const hasFallbackBackground = fallbackBackgroundList.includes(hostname);
+    const hasFallbackBackground =
+      fallbackBackgroundList.includes(hostname) !==
+      !!globalSettings.fallbackBackgroundBlacklistMode;
 
     if (stylingState.reason === "globally_disabled") {
       setIcon(tab.id, false);
@@ -725,7 +728,8 @@ async function applyCSS(tabId, hostname, features) {
   const fallbackBackgroundList = fallbackData[FALLBACK_BACKGROUND_KEY] || [];
   const normalizedHostname = normalizeHostname(hostname);
   const hasFallbackBackground =
-    fallbackBackgroundList.includes(normalizedHostname);
+    fallbackBackgroundList.includes(normalizedHostname) !==
+    !!globalSettings.fallbackBackgroundBlacklistMode;
 
   const siteKey = `transparentZenSettings.${normalizedHostname}`;
   const siteData = await browser.storage.local.get(siteKey);

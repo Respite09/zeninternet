@@ -103,6 +103,9 @@ new (class ExtensionPopup {
   whatsNewButton = $("whats-new");
   howToUseButton = $("how-to-use");
   fallbackBackgroundSwitch = $("fallback-background");
+  fallbackBackgroundModeSwitch = $("fallback-background-mode");
+  fallbackBackgroundLabel = $("fallback-background-label");
+  fallbackBackgroundModeLabel = $("fallback-background-mode-label");
   fallbackBackgroundList = [];
   hasLoadedFeaturesOnce = false;
   isInternalUpdate = false;
@@ -277,6 +280,11 @@ new (class ExtensionPopup {
       this.saveSkipThemingList();
     });
 
+    this.fallbackBackgroundModeSwitch.addEventListener("change", () => {
+      this.updateFallbackModeLabels();
+      this.saveSettings();
+    });
+
     this.fallbackBackgroundSwitch.addEventListener("change", () => {
       this.saveFallbackBackgroundList();
     });
@@ -310,6 +318,8 @@ new (class ExtensionPopup {
     this.whitelistStylingModeSwitch.checked =
       this.globalSettings.whitelistStyleMode ?? false;
 
+    this.fallbackBackgroundModeSwitch.checked =
+      this.globalSettings.fallbackBackgroundBlacklistMode ?? false;
     this.updateModeLabels();
 
     this.skipForceThemingSwitch.checked = this.skipForceThemingList.includes(
@@ -377,6 +387,8 @@ new (class ExtensionPopup {
     this.globalSettings.forceStyling = this.forceStylingSwitch.checked;
     this.globalSettings.whitelistStyleMode = this.whitelistStylingModeSwitch.checked;
     this.globalSettings.whitelistMode = this.whitelistModeSwitch.checked;
+    this.globalSettings.fallbackBackgroundBlacklistMode =
+      this.fallbackBackgroundModeSwitch.checked;
 
     const updateObj = { [this.BROWSER_STORAGE_KEY]: this.globalSettings };
 
@@ -1512,7 +1524,19 @@ new (class ExtensionPopup {
   /**
    * Updates all mode-related labels in the UI.
    */
+  updateFallbackModeLabels() {
+    if (this.fallbackBackgroundModeSwitch.checked) {
+      this.fallbackBackgroundModeLabel.textContent = "Fallback Blacklist Mode";
+      this.fallbackBackgroundLabel.textContent =
+        "Skip Fallback Background for this Site";
+    } else {
+      this.fallbackBackgroundModeLabel.textContent = "Fallback Whitelist Mode";
+      this.fallbackBackgroundLabel.textContent = "Fallback Background";
+    }
+  }
+
   updateModeLabels() {
+    this.updateFallbackModeLabels();
     if (this.whitelistModeSwitch.checked) {
       this.whitelistModeLabel.textContent = "Forced Whitelist Mode";
       this.siteToggleLabel.textContent = "Enable forcing for this Site";
