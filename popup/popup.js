@@ -142,6 +142,17 @@ new (class ExtensionPopup {
       this.saveSettings.bind(this)
     );
     this.reloadButton.addEventListener("click", this.reloadPage.bind(this));
+    const pickButton = $("pick-element");
+    if (pickButton) {
+      pickButton.addEventListener("click", async () => {
+        await this.sendToActiveTab("startElementPicker");
+        window.close();
+      });
+    }
+    const resetPicked = $("reset-picked");
+    if (resetPicked) {
+      resetPicked.addEventListener("click", () => this.sendToActiveTab("resetTransparentElements"));
+    }
 
     document
       .getElementById("toggle-features")
@@ -1464,6 +1475,11 @@ new (class ExtensionPopup {
   /**
    * Reloads the currently active tab.
    */
+  async sendToActiveTab(action) {
+    const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
+    if (tab) await browser.tabs.sendMessage(tab.id, { action }).catch(() => {});
+  }
+
   reloadPage() {
     browser.tabs.reload();
   }
