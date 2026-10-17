@@ -25,7 +25,7 @@
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "js": ["shared/polyfill.js", "content-script.js"],
+      "js": ["shared/polyfill.js", "content-script.js", "element-picker.js"],
       "run_at": "document_start",
       "all_frames": false
     }
