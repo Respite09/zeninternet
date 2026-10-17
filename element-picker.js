@@ -1,4 +1,4 @@
-// Element picker: click any element on the page to make its background transparent (like uBlock Origin's element zapper).
+// Element picker: click any element on the page to make its background transparent, blur it, or remove it (like uBlock Origin's element zapper).
 (function () {
   if (window.__zenElementPickerLoaded) return;
   window.__zenElementPickerLoaded = true;
@@ -65,6 +65,8 @@
     style.textContent = selectors
       .map(normalize)
       .map((e) => {
+        if (e.mode === "remove") return `${e.selector} { display: none !important; }`;
+        if (e.mode === "blur") return `${e.selector} { filter: blur(${Number(e.blur) || 0}px) !important; }`;
         const bg = e.alpha > 0 ? hexToRgba(e.color, e.alpha) : "transparent";
         return `${e.selector} { background: ${bg} !important; background-image: none !important; box-shadow: none !important; }\n${e.selector} * { background: transparent !important; background-image: none !important; box-shadow: none !important; }`;
       })
@@ -88,7 +90,14 @@
       "position:fixed;top:16px;right:16px;z-index:2147483647;background:#222;color:#fff;font:13px sans-serif;" +
       "padding:12px;border-radius:8px;box-shadow:0 2px 12px rgba(0,0,0,.5);display:flex;flex-direction:column;gap:8px;width:200px;";
     const label = document.createElement("div");
-    label.textContent = "Element tint";
+    label.textContent = "Element action";
+    const mode = document.createElement("select");
+    [["tint", "Tint / transparent"], ["blur", "Blur"], ["remove", "Remove"]].forEach(([v, t]) => {
+      const o = document.createElement("option");
+      o.value = v;
+      o.textContent = t;
+      mode.appendChild(o);
+    });
     const color = document.createElement("input");
     color.type = "color";
     color.value = "#000000";
@@ -106,14 +115,24 @@
     const cancel = document.createElement("button");
     cancel.textContent = "Cancel";
     row.append(ok, cancel);
-    panel.append(label, color, range, hint, row);
+    panel.append(label, mode, color, range, hint, row);
     document.documentElement.appendChild(panel);
 
-    const current = () => ({ selector, color: color.value, alpha: Number(range.value) / 100 });
+    const current = () =>
+      mode.value === "remove"
+        ? { selector, mode: "remove" }
+        : mode.value === "blur"
+          ? { selector, mode: "blur", blur: Number(range.value) * 0.3 }
+          : { selector, mode: "tint", color: color.value, alpha: Number(range.value) / 100 };
     const preview = () => {
-      hint.textContent = range.value + "% tint";
+      color.style.display = mode.value === "tint" ? "" : "none";
+      range.style.display = mode.value === "remove" ? "none" : "";
+      hint.style.display = mode.value === "remove" ? "none" : "";
+      hint.textContent =
+        mode.value === "blur" ? (Number(range.value) * 0.3).toFixed(1) + "px blur" : range.value + "% tint";
       renderStyle([current()]);
     };
+    mode.addEventListener("change", preview);
     color.addEventListener("input", preview);
     range.addEventListener("input", preview);
     ok.addEventListener("click", () => {
