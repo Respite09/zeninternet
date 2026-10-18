@@ -106,7 +106,14 @@
     const data = await browser.storage.local.get(STORAGE_KEY);
     const all = data[STORAGE_KEY] || {};
     const list = (all[HOST] || []).filter((e) => normalize(e).selector !== entry.selector);
-    list.push(entry);
+    if (
+      entry.mode === "remove" ||
+      !entry.effects ||
+      entry.effects.tint?.enabled ||
+      entry.effects.blur?.enabled
+    ) {
+      list.push(entry);
+    }
     all[HOST] = list;
     await browser.storage.local.set({ [STORAGE_KEY]: all });
     renderStyle(list);
@@ -184,7 +191,9 @@
         tintToggle.checked ? `${opacity.value}% tint` : "",
         blurToggle.checked ? `${(Number(blurAmount.value) * 0.3).toFixed(1)}px blur` : "",
       ].filter(Boolean).join(" · ");
-      ok.disabled = !tintToggle.checked && !blurToggle.checked;
+      if (!tintToggle.checked && !blurToggle.checked) {
+        hint.textContent = "No effects selected; Apply clears this selector's effects.";
+      }
       renderStyle([
         ...savedSelectors.filter((entry) => normalize(entry).selector !== selector),
         current(),
