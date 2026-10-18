@@ -112,7 +112,13 @@
     renderStyle(list);
   }
 
-  function showTintPanel(selector, el) {
+  async function showTintPanel(selector) {
+    const savedSelectors = await getSelectors();
+    const savedEntry = savedSelectors
+      .map(normalize)
+      .find((entry) => entry.selector === selector);
+    const savedTint = savedEntry?.effects?.tint;
+    const savedBlur = savedEntry?.effects?.blur;
     const panel = document.createElement("div");
     panel.id = "zen-tint-panel";
     panel.style.cssText =
@@ -122,26 +128,27 @@
     label.textContent = "Element effects";
     const tintToggle = document.createElement("input");
     tintToggle.type = "checkbox";
-    tintToggle.checked = true;
+    tintToggle.checked = savedTint ? savedTint.enabled : savedEntry?.mode !== "blur";
     const tintLabel = document.createElement("label");
     tintLabel.append(tintToggle, " Tint / transparency");
     const color = document.createElement("input");
     color.type = "color";
-    color.value = "#000000";
+    color.value = savedTint?.color || savedEntry?.color || "#000000";
     const opacity = document.createElement("input");
     opacity.type = "range";
     opacity.min = "0";
     opacity.max = "100";
-    opacity.value = "0";
+    opacity.value = String(Math.round((savedTint?.alpha ?? savedEntry?.alpha ?? 0) * 100));
     const blurToggle = document.createElement("input");
     blurToggle.type = "checkbox";
+    blurToggle.checked = savedBlur ? savedBlur.enabled : savedEntry?.mode === "blur";
     const blurLabel = document.createElement("label");
     blurLabel.append(blurToggle, " Blur");
     const blurAmount = document.createElement("input");
     blurAmount.type = "range";
     blurAmount.min = "0";
     blurAmount.max = "100";
-    blurAmount.value = "20";
+    blurAmount.value = String(Math.min(100, Math.max(0, Math.round((savedBlur?.amount ?? savedEntry?.blur ?? 6) / 0.3))));
     const hint = document.createElement("div");
     const row = document.createElement("div");
     row.style.cssText = "display:flex;gap:8px;";
@@ -178,7 +185,10 @@
         blurToggle.checked ? `${(Number(blurAmount.value) * 0.3).toFixed(1)}px blur` : "",
       ].filter(Boolean).join(" · ");
       ok.disabled = !tintToggle.checked && !blurToggle.checked;
-      renderStyle([current()]);
+      renderStyle([
+        ...savedSelectors.filter((entry) => normalize(entry).selector !== selector),
+        current(),
+      ]);
     };
     tintToggle.addEventListener("change", preview);
     blurToggle.addEventListener("change", preview);
@@ -198,6 +208,26 @@
       renderStyle(await getSelectors());
     });
     preview();
+  }
+
+  function editElementBySelector(selector) {
+    const normalizedSelector = String(selector || "").trim();
+    if (!normalizedSelector) {
+      return Promise.resolve({ success: false, error: "Enter a CSS selector first." });
+    }
+
+    try {
+      const matches = document.querySelectorAll(normalizedSelector);
+      if (!matches.length) {
+        return Promise.resolve({ success: false, error: "No elements match that CSS selector on this page." });
+      }
+      if (Array.from(matches).includes(document.documentElement)) {
+        return Promise.resolve({ success: false, error: "The page root cannot be edited with the element picker." });
+      }
+      return showTintPanel(normalizedSelector).then(() => ({ success: true }));
+    } catch (error) {
+      return Promise.resolve({ success: false, error: "That CSS selector is invalid." });
+    }
   }
 
   async function reset() {
@@ -236,7 +266,7 @@
     const el = e.target;
     stop();
     if (el && el.nodeType === 1 && el !== document.documentElement) {
-      showTintPanel(cssPath(el), el);
+      showTintPanel(cssPath(el));
     }
   }
 
@@ -281,6 +311,9 @@
     }
     if (message.action === "resetTransparentElements") {
       return reset().then(() => ({ success: true }));
+    }
+    if (message.action === "editElementBySelector") {
+      return editElementBySelector(message.selector);
     }
     return false;
   });

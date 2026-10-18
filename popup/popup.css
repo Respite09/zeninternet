@@ -91,7 +91,7 @@ body {
 }
 
 body:has(#reload) .app-content {
-  padding-top: 150px;
+  padding-top: 190px;
 }
 
 body:has(.data-section) .app-content {
@@ -102,6 +102,27 @@ body:has(.data-section) .app-content {
   flex-direction: row;
   width: 100%;
   transition: all 0.2s ease-in-out;
+}
+
+.selector-edit-row {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+}
+
+.selector-edit-row input {
+  box-sizing: border-box;
+  flex: 1;
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  background: var(--bg-color);
+}
+
+.selector-edit-row .action-button {
+  padding: 8px 12px;
 }
 
 .logo-container {
