@@ -149,6 +149,28 @@ new (class ExtensionPopup {
         window.close();
       });
     }
+    const selectorInput = $("element-selector");
+    const editSelectorButton = $("edit-element-selector");
+    if (selectorInput && editSelectorButton) {
+      const editBySelector = async () => {
+        const selector = selectorInput.value.trim();
+        if (!selector) {
+          selectorInput.focus();
+          return;
+        }
+
+        const response = await this.sendToActiveTab("editElementBySelector", { selector });
+        if (response?.success) {
+          window.close();
+        } else {
+          alert(response?.error || "Could not open the element editor.");
+        }
+      };
+      editSelectorButton.addEventListener("click", editBySelector);
+      selectorInput.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") editBySelector();
+      });
+    }
     const resetPicked = $("reset-picked");
     if (resetPicked) {
       resetPicked.addEventListener("click", () => this.sendToActiveTab("resetTransparentElements"));
@@ -1475,9 +1497,12 @@ new (class ExtensionPopup {
   /**
    * Reloads the currently active tab.
    */
-  async sendToActiveTab(action) {
+  async sendToActiveTab(action, details = {}) {
     const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
-    if (tab) await browser.tabs.sendMessage(tab.id, { action }).catch(() => {});
+    if (tab) {
+      return browser.tabs.sendMessage(tab.id, { action, ...details }).catch(() => null);
+    }
+    return null;
   }
 
   reloadPage() {

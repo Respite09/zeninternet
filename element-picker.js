@@ -35,7 +35,7 @@
     return parts.join(" > ");
   }
 
-  // Entries may be legacy strings or {selector, color, alpha}
+  // Entries may be legacy strings or saved effect objects.
   function normalize(e) {
     return typeof e === "string" ? { selector: e, color: "#000000", alpha: 0 } : e;
   }
@@ -66,9 +66,38 @@
       .map(normalize)
       .map((e) => {
         if (e.mode === "remove") return `${e.selector} { display: none !important; }`;
-        if (e.mode === "blur") return `${e.selector} { background-color: transparent !important; background-image: none !important; backdrop-filter: blur(${Number(e.blur) || 0}px) !important; -webkit-backdrop-filter: blur(${Number(e.blur) || 0}px) !important; }`;
-        const bg = e.alpha > 0 ? hexToRgba(e.color, e.alpha) : "transparent";
-        return `${e.selector} { background: ${bg} !important; background-image: none !important; box-shadow: none !important; }\n${e.selector} * { background: transparent !important; background-image: none !important; box-shadow: none !important; }`;
+        const tint = e.effects?.tint;
+        const blur = e.effects?.blur;
+        const tintEnabled = tint ? tint.enabled : e.mode !== "blur";
+        const blurEnabled = blur ? blur.enabled : e.mode === "blur";
+        const declarations = [];
+        let css = "";
+
+        if (tintEnabled) {
+          const color = tint ? tint.color : e.color;
+          const alpha = tint ? tint.alpha : e.alpha;
+          const bg = alpha > 0 ? hexToRgba(color, alpha) : "transparent";
+          declarations.push(
+            `background: ${bg} !important`,
+            "background-image: none !important",
+            "box-shadow: none !important"
+          );
+          css += `${e.selector} * { background: transparent !important; background-image: none !important; box-shadow: none !important; }\n`;
+        }
+
+        if (blurEnabled) {
+          const amount = blur ? blur.amount : e.blur;
+          if (!tintEnabled) declarations.push("background-color: transparent !important");
+          declarations.push(
+            `backdrop-filter: blur(${Number(amount) || 0}px) !important`,
+            `-webkit-backdrop-filter: blur(${Number(amount) || 0}px) !important`
+          );
+        }
+
+        if (declarations.length) {
+          css = `${e.selector} { ${declarations.join("; ")}; }\n${css}`;
+        }
+        return css;
       })
       .join("\n");
   }
@@ -77,73 +106,137 @@
     const data = await browser.storage.local.get(STORAGE_KEY);
     const all = data[STORAGE_KEY] || {};
     const list = (all[HOST] || []).filter((e) => normalize(e).selector !== entry.selector);
-    list.push(entry);
+    if (
+      entry.mode === "remove" ||
+      !entry.effects ||
+      entry.effects.tint?.enabled ||
+      entry.effects.blur?.enabled
+    ) {
+      list.push(entry);
+    }
     all[HOST] = list;
     await browser.storage.local.set({ [STORAGE_KEY]: all });
     renderStyle(list);
   }
 
-  function showTintPanel(selector, el) {
+  async function showTintPanel(selector) {
+    const savedSelectors = await getSelectors();
+    const savedEntry = savedSelectors
+      .map(normalize)
+      .find((entry) => entry.selector === selector);
+    const savedTint = savedEntry?.effects?.tint;
+    const savedBlur = savedEntry?.effects?.blur;
     const panel = document.createElement("div");
     panel.id = "zen-tint-panel";
     panel.style.cssText =
       "position:fixed;top:16px;right:16px;z-index:2147483647;background:#222;color:#fff;font:13px sans-serif;" +
       "padding:12px;border-radius:8px;box-shadow:0 2px 12px rgba(0,0,0,.5);display:flex;flex-direction:column;gap:8px;width:200px;";
     const label = document.createElement("div");
-    label.textContent = "Element action";
-    const mode = document.createElement("select");
-    [["tint", "Tint / transparent"], ["blur", "Blur"], ["remove", "Remove"]].forEach(([v, t]) => {
-      const o = document.createElement("option");
-      o.value = v;
-      o.textContent = t;
-      mode.appendChild(o);
-    });
+    label.textContent = "Element effects";
+    const tintToggle = document.createElement("input");
+    tintToggle.type = "checkbox";
+    tintToggle.checked = savedTint ? savedTint.enabled : savedEntry?.mode !== "blur";
+    const tintLabel = document.createElement("label");
+    tintLabel.append(tintToggle, " Tint / transparency");
     const color = document.createElement("input");
     color.type = "color";
-    color.value = "#000000";
-    const range = document.createElement("input");
-    range.type = "range";
-    range.min = "0";
-    range.max = "100";
-    range.value = "0";
+    color.value = savedTint?.color || savedEntry?.color || "#000000";
+    const opacity = document.createElement("input");
+    opacity.type = "range";
+    opacity.min = "0";
+    opacity.max = "100";
+    opacity.value = String(Math.round((savedTint?.alpha ?? savedEntry?.alpha ?? 0) * 100));
+    const blurToggle = document.createElement("input");
+    blurToggle.type = "checkbox";
+    blurToggle.checked = savedBlur ? savedBlur.enabled : savedEntry?.mode === "blur";
+    const blurLabel = document.createElement("label");
+    blurLabel.append(blurToggle, " Blur");
+    const blurAmount = document.createElement("input");
+    blurAmount.type = "range";
+    blurAmount.min = "0";
+    blurAmount.max = "100";
+    blurAmount.value = String(Math.min(100, Math.max(0, Math.round((savedBlur?.amount ?? savedEntry?.blur ?? 6) / 0.3))));
     const hint = document.createElement("div");
-    hint.textContent = "0% = fully transparent";
     const row = document.createElement("div");
     row.style.cssText = "display:flex;gap:8px;";
     const ok = document.createElement("button");
     ok.textContent = "Apply";
+    const remove = document.createElement("button");
+    remove.textContent = "Remove element";
     const cancel = document.createElement("button");
     cancel.textContent = "Cancel";
-    row.append(ok, cancel);
-    panel.append(label, mode, color, range, hint, row);
+    row.append(ok, remove, cancel);
+    panel.append(label, tintLabel, color, opacity, blurLabel, blurAmount, hint, row);
     document.documentElement.appendChild(panel);
 
-    const current = () =>
-      mode.value === "remove"
-        ? { selector, mode: "remove" }
-        : mode.value === "blur"
-          ? { selector, mode: "blur", blur: Number(range.value) * 0.3 }
-          : { selector, mode: "tint", color: color.value, alpha: Number(range.value) / 100 };
+    const current = () => ({
+      selector,
+      effects: {
+        tint: {
+          enabled: tintToggle.checked,
+          color: color.value,
+          alpha: Number(opacity.value) / 100,
+        },
+        blur: {
+          enabled: blurToggle.checked,
+          amount: Number(blurAmount.value) * 0.3,
+        },
+      },
+    });
     const preview = () => {
-      color.style.display = mode.value === "tint" ? "" : "none";
-      range.style.display = mode.value === "remove" ? "none" : "";
-      hint.style.display = mode.value === "remove" ? "none" : "";
-      hint.textContent =
-        mode.value === "blur" ? (Number(range.value) * 0.3).toFixed(1) + "px blur" : range.value + "% tint";
-      renderStyle([current()]);
+      color.style.display = tintToggle.checked ? "" : "none";
+      opacity.style.display = tintToggle.checked ? "" : "none";
+      blurAmount.style.display = blurToggle.checked ? "" : "none";
+      hint.textContent = [
+        tintToggle.checked ? `${opacity.value}% tint` : "",
+        blurToggle.checked ? `${(Number(blurAmount.value) * 0.3).toFixed(1)}px blur` : "",
+      ].filter(Boolean).join(" · ");
+      if (!tintToggle.checked && !blurToggle.checked) {
+        hint.textContent = "No effects selected; Apply clears this selector's effects.";
+      }
+      renderStyle([
+        ...savedSelectors.filter((entry) => normalize(entry).selector !== selector),
+        current(),
+      ]);
     };
-    mode.addEventListener("change", preview);
+    tintToggle.addEventListener("change", preview);
+    blurToggle.addEventListener("change", preview);
     color.addEventListener("input", preview);
-    range.addEventListener("input", preview);
+    opacity.addEventListener("input", preview);
+    blurAmount.addEventListener("input", preview);
     ok.addEventListener("click", () => {
       panel.remove();
       saveSelector(current());
+    });
+    remove.addEventListener("click", () => {
+      panel.remove();
+      saveSelector({ selector, mode: "remove" });
     });
     cancel.addEventListener("click", async () => {
       panel.remove();
       renderStyle(await getSelectors());
     });
     preview();
+  }
+
+  function editElementBySelector(selector) {
+    const normalizedSelector = String(selector || "").trim();
+    if (!normalizedSelector) {
+      return Promise.resolve({ success: false, error: "Enter a CSS selector first." });
+    }
+
+    try {
+      const matches = document.querySelectorAll(normalizedSelector);
+      if (!matches.length) {
+        return Promise.resolve({ success: false, error: "No elements match that CSS selector on this page." });
+      }
+      if (Array.from(matches).includes(document.documentElement)) {
+        return Promise.resolve({ success: false, error: "The page root cannot be edited with the element picker." });
+      }
+      return showTintPanel(normalizedSelector).then(() => ({ success: true }));
+    } catch (error) {
+      return Promise.resolve({ success: false, error: "That CSS selector is invalid." });
+    }
   }
 
   async function reset() {
@@ -182,7 +275,7 @@
     const el = e.target;
     stop();
     if (el && el.nodeType === 1 && el !== document.documentElement) {
-      showTintPanel(cssPath(el), el);
+      showTintPanel(cssPath(el));
     }
   }
 
@@ -227,6 +320,9 @@
     }
     if (message.action === "resetTransparentElements") {
       return reset().then(() => ({ success: true }));
+    }
+    if (message.action === "editElementBySelector") {
+      return editElementBySelector(message.selector);
     }
     return false;
   });
